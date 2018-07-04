@@ -1,0 +1,172 @@
+<html>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+
+    <style type="text/css">
+        body {
+            background-color: #322135;
+            color: white;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        div#main {
+            margin: auto;
+        }
+
+        div.card {
+            display: inline-block;
+            background-color: black;
+            width: 100px;
+            height: 120px;
+            border: 1px solid orange;
+            margin: 5px;
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        div.count {
+            font-size: 4em;
+            color: greenyellow;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .card_title {
+            font-size: 0.9em;
+        }
+
+        .voted {
+            color: gray !important;
+            background-color: silver !important;
+        }
+
+        .voted div {
+            color: gray !important;
+        }
+
+        .list_item {
+            font-size: 1.5em;
+        }
+
+        div.button {
+            margin: auto;
+            padding: 10px;
+            border: 1px cornflowerblue solid;
+            background-color: burlywood;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .disabled {
+            background-color: silver !important;
+            color: gray !important;
+        }
+    </style>
+
+    <body>
+        <div id="main" ng-app="coffeeApp" ng-controller="selector">
+            <div ng-show="votingMode">
+                <div ng-show="name.length > 0">Name: {{name}}</div>
+                <form ng-submit="enterName()" ng-show="name.length == 0">
+                    <div>Name: <input type="text" ng-model="in_name" size="20"/> </div>
+                </form>
+                <div class="card" ng-repeat="o in orders" ng-click="productClick(o.item)" ng-class="{voted: !canVote}">
+                    <div class="card_title">{{o.item}}</div>
+                    <div class="count">{{o.count}}</div>
+                </div><br>
+                <div class="button" ng-click="reset()">Reset all!</div>
+                <div class="button" ng-click="cancel()">Cancel mine</div>
+                <div class="button" ng-click="toggleMode()">Show orders</div>
+            </div>
+            <div ng-hide="votingMode">
+                <div ng-repeat="d in details" ng-show="details.length>0">
+                    <div class="list_item">{{d.name}} : {{d.item}}</div>
+                </div>
+                <div class="list_item" ng-show="details.length == 0">No order.<br>Everybody's happy, yaay!</div>
+                <div>&nbsp;</div>
+                <div class="button" ng-click="toggleMode()">Back</div>
+            </div>
+        </div>
+    </body>
+
+    <script>
+            var app = angular.module('coffeeApp', []);
+            app.controller('selector', function($scope, $http) {
+
+                $scope.votingMode = true;
+                $scope.name = '';
+                $scope.canVote = false;
+
+                $http.get("/api/totals")
+                    .then(function(response) {
+                        $scope.orders = response.data;
+                    });
+
+                $http.get("/api/order")
+                    .then(response => {
+                        $scope.details = response.data;
+                    });
+
+                $scope.productClick = function(item){
+                    if (!$scope.canVote) {
+                        return;
+                    }
+                    $http.post("/api/order/" + $scope.name + "/" + item)
+                        .then(function(response) {
+                            $scope.orders = response.data;
+                            $scope.canVote = false;
+                        });
+                }
+
+                $scope.reset = function() {
+                    $http.delete("/api/order/")
+                    .then(function(response) {
+                            $scope.orders = response.data;
+                            $scope.canVote = true;
+                        });
+                }
+
+                $scope.cancel = function() {
+                    if ($scope.canVote) {
+                        return;
+                    }
+                    $http.delete("/api/order/" + $scope.name)
+                    .then(function(response) {
+                            $scope.orders = response.data;
+                            $scope.canVote = true;
+                        });
+                }
+
+                $scope.enterName = function() {
+                    $scope.name = $scope.in_name;
+                    refresh();
+                }
+
+                $scope.toggleMode = function() {
+                    refresh();
+                    $scope.votingMode = !$scope.votingMode;
+                }
+
+                setInterval(()=> {
+                    refresh();
+                }, 3000);
+
+                function refresh() {
+                    $http.get("/api/totals")
+                    .then(function(response) {
+                        $scope.orders = response.data;
+                    });                    
+
+                    $http.get("/api/order")
+                        .then(response => {
+                            $scope.details = response.data;
+                            $scope.canVote = $scope.name.length>0 && $scope
+                                                .details
+                                                .filter(x => x.name == $scope.name)
+                                                .length == 0; 
+                        })
+                }
+            });
+    </script>    
+</html>
